@@ -12,3 +12,21 @@ main { max-width: 32rem; margin: 3rem auto; padding: 0 1rem; }
 }
 .game { width: 100%; text-align: left; font-size: 1.1rem; }
 button:disabled { color: #8e8e93; cursor: not-allowed; }
+.profile { display: grid; gap: 1rem; margin-bottom: 1rem; }
+.profile label { display: grid; gap: 0.25rem; }
+.profile input:not([type=radio]) { font: inherit; padding: 0.5rem; border-radius: 0.5rem; border: 1px solid #c7c7cc; }
+.emojis { display: flex; flex-wrap: wrap; gap: 0.25rem; border: 0; padding: 0; }
+.emoji { font-size: 1.6rem; padding: 0.25rem; border-radius: 0.5rem; cursor: pointer; border: 2px solid transparent; }
+.emoji input { position: absolute; opacity: 0; pointer-events: none; }
+.emoji.picked { border-color: #0071e3; background: #fff; }
+.error { color: #c00; }
+.link code { word-break: break-all; }
+.players { list-style: none; padding: 0; display: flex; justify-content: space-between; gap: 0.5rem; }
+.player { padding: 0.5rem 0.75rem; border-radius: 0.5rem; border: 2px solid transparent; }
+.player.active { border-color: #0071e3; background: #fff; }
+.mark { font-weight: 700; }
+.status { font-weight: 600; text-align: center; }
+.board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; max-width: 18rem; margin: 0 auto; }
+.cell { aspect-ratio: 1; font-size: 2.5rem; font-weight: 700; padding: 0; color: #1d1d1f; }
+.cell:disabled { color: #1d1d1f; cursor: default; }
+.cell.win { background: #d1f2d9; }
