@@ -1,4 +1,4 @@
-import { applyMove, newGame, type GameState, type Profile } from '../game/ticTacToe'
+import { applyMove, newGame, voteRematch, type GameState, type Profile } from '../game/ticTacToe'
 import type { Message } from '../net/protocol'
 
 export interface HostState {
@@ -23,6 +23,8 @@ export function hostHandle(state: HostState, msg: Message): HostResult {
       return withGame(state, newGame({ X: state.host, O: { name: msg.name, emoji: msg.emoji } }))
     case 'move':
       return state.game ? withGame(state, applyMove(state.game, 'O', msg.cell)) : { state, replies: [] }
+    case 'rematch':
+      return state.game ? withGame(state, voteRematch(state.game, 'O')) : { state, replies: [] }
     default:
       return { state, replies: [] }
   }
@@ -31,4 +33,9 @@ export function hostHandle(state: HostState, msg: Message): HostResult {
 /** The host's own move (always X). */
 export function hostMove(state: HostState, cell: number): HostResult {
   return state.game ? withGame(state, applyMove(state.game, 'X', cell)) : { state, replies: [] }
+}
+
+/** The host's own rematch vote (always X). */
+export function hostRematch(state: HostState): HostResult {
+  return state.game ? withGame(state, voteRematch(state.game, 'X')) : { state, replies: [] }
 }

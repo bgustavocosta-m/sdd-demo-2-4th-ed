@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Profile } from '../game/ticTacToe'
+import { other, type Mark, type Profile } from '../game/ticTacToe'
 import { isHosting, usePeerRoom } from '../net/usePeerRoom'
 import { navigate } from '../router/useHashPath'
 import { isValidSlug } from '../room/slug'
@@ -30,8 +30,21 @@ function NewRoom({ message }: { message: string }) {
   )
 }
 
+function Rematch({ votes, me, onVote }: { votes: Mark[]; me: Mark; onVote: () => void }) {
+  const mine = votes.includes(me)
+  const theirs = votes.includes(other(me))
+  return (
+    <div className="rematch">
+      <button onClick={onVote} disabled={mine}>
+        {mine ? 'Rematch requested' : 'Rematch'}
+      </button>
+      <p>{theirs ? 'Opponent wants a rematch' : mine ? 'Waiting for opponent…' : ''}</p>
+    </div>
+  )
+}
+
 function Room({ slug, profile }: { slug: string; profile: Profile | null }) {
-  const { role, status, state, sendMove } = usePeerRoom({ slug, profile })
+  const { role, status, state, sendMove, sendRematch } = usePeerRoom({ slug, profile })
   const [copied, setCopied] = useState(false)
   const me = role === 'host' ? 'X' : 'O'
 
@@ -79,6 +92,7 @@ function Room({ slug, profile }: { slug: string; profile: Profile | null }) {
         <>
           <PlayerBar state={state} me={me} />
           <Board state={state} canMove={status === 'playing' && !state.result && state.turn === me} onMove={sendMove} />
+          {state.result && status === 'playing' && <Rematch votes={state.rematchVotes} me={me} onVote={sendRematch} />}
         </>
       )}
     </main>
