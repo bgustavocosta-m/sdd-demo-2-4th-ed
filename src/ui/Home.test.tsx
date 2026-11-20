@@ -1,21 +1,23 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, expect, it } from 'vitest'
 import { Home } from './Home'
 
-afterEach(() => {
-  cleanup()
-  window.location.hash = ''
+afterEach(cleanup)
+
+it('links the wordmark home', () => {
+  render(<Home />)
+  expect(screen.getByRole('link', { name: 'board games' }).getAttribute('href')).toBe('#/')
 })
 
-it('shows tic-tac-toe and checkers coming soon', () => {
+it('links tic-tac-toe to #/tic-tac-toe', () => {
   render(<Home />)
-  expect(screen.getByRole('button', { name: 'Tic-tac-toe' })).toBeTruthy()
-  const checkers = screen.getByRole('button', { name: 'Checkers — coming soon' })
-  expect((checkers as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.getByRole('link', { name: /Tic-tac-toe/ }).getAttribute('href')).toBe('#/tic-tac-toe')
 })
 
-it('goes to #/tic-tac-toe when tic-tac-toe is picked', () => {
+it('shows checkers as coming soon and not clickable', () => {
   render(<Home />)
-  fireEvent.click(screen.getByRole('button', { name: 'Tic-tac-toe' }))
-  expect(window.location.hash).toBe('#/tic-tac-toe')
+  const card = screen.getByText('Coming soon').closest('[aria-disabled]')
+  expect(card?.getAttribute('aria-disabled')).toBe('true')
+  expect(screen.queryByRole('link', { name: /Checkers/ })).toBeNull()
+  expect(screen.queryByRole('button', { name: /Checkers/ })).toBeNull()
 })

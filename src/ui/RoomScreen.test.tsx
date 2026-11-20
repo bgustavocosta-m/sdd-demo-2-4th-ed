@@ -44,9 +44,9 @@ afterEach(() => {
 
 async function joinAsGuest(slug: string) {
   render(<RoomScreen slug={slug} />)
-  fireEvent.change(screen.getByLabelText(/name/i), { target: { value: 'Bo' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Join room' }))
-  await screen.findByText('Connecting…')
+  fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Bo' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Join game' }))
+  await screen.findByRole('heading', { name: 'Connecting…' })
   const peer = peers[0]
   act(() => peer.handlers.open())
   return peer
@@ -57,14 +57,22 @@ it.each(['', 'ABCDEF', 'abcde', 'abcdefg', 'abcde1', 'abcdeo', 'abcdel', 'abcdei
   (slug) => {
     render(<RoomScreen slug={slug} />)
     expect(screen.getByRole('heading', { name: 'Invalid room link' })).toBeTruthy()
+    expect(screen.getByRole('alert').querySelector('.bad-slug')?.textContent).toBe(slug)
     expect(peers).toHaveLength(0)
   },
 )
 
-it('"Create a new room" goes to the create page', () => {
+it('alert screens link to the create page and back to games', () => {
   render(<RoomScreen slug="nope" />)
-  fireEvent.click(screen.getByRole('button', { name: 'Create a new room' }))
-  expect(window.location.hash).toBe('#/tic-tac-toe')
+  expect(screen.getByRole('link', { name: 'Create a new room' }).getAttribute('href')).toBe('#/tic-tac-toe')
+  expect(screen.getByRole('link', { name: 'Back to games' }).getAttribute('href')).toBe('#/')
+})
+
+it('a guest on a valid link sees the invite with an O preview', () => {
+  render(<RoomScreen slug="abcdef" />)
+  expect(screen.getByRole('heading', { name: 'You’re invited' })).toBeTruthy()
+  expect(screen.getByText('room abcdef')).toBeTruthy()
+  expect(screen.getByText(/You’ll play/).textContent).toContain('as')
 })
 
 it('peer-unavailable → "Room not found or host left", and a later close keeps it', async () => {
@@ -73,7 +81,7 @@ it('peer-unavailable → "Room not found or host left", and a later close keeps 
   expect(screen.getByRole('heading', { name: 'Room not found or host left' })).toBeTruthy()
   act(() => peer.conn.handlers.close())
   expect(screen.getByRole('heading', { name: 'Room not found or host left' })).toBeTruthy()
-  expect(screen.getByRole('button', { name: 'Create a new room' })).toBeTruthy()
+  expect(screen.getByRole('link', { name: 'Create a new room' })).toBeTruthy()
 })
 
 it('full from the host → "Room is full", and the host closing keeps it', async () => {
@@ -82,5 +90,5 @@ it('full from the host → "Room is full", and the host closing keeps it', async
   expect(screen.getByRole('heading', { name: 'Room is full' })).toBeTruthy()
   act(() => peer.conn.handlers.close())
   expect(screen.getByRole('heading', { name: 'Room is full' })).toBeTruthy()
-  expect(screen.getByRole('button', { name: 'Create a new room' })).toBeTruthy()
+  expect(screen.getByRole('link', { name: 'Create a new room' })).toBeTruthy()
 })
