@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyMove, newGame, winner, type Board, type Players } from './ticTacToe'
+import { applyMove, newGame, voteRematch, winner, type Board, type Players } from './ticTacToe'
 
 const players: Players = {
   X: { name: 'Ana', emoji: '🦊' },
@@ -68,5 +68,31 @@ describe('applyMove', () => {
   it('records a draw', () => {
     const s = play([0, 1, 2, 4, 3, 5, 7, 6, 8])
     expect(s.result).toEqual({ winner: null })
+  })
+})
+
+describe('voteRematch', () => {
+  it('ignores votes before the game ends', () => {
+    const s = newGame(players)
+    expect(voteRematch(s, 'X')).toBe(s)
+  })
+  it('records one vote and ignores repeats', () => {
+    const s = voteRematch(play([0, 3, 1, 4, 2]), 'O')
+    expect(s.rematchVotes).toEqual(['O'])
+    expect(s.result).not.toBeNull()
+    expect(voteRematch(s, 'O')).toBe(s)
+  })
+  it('resets with the loser starting once both voted', () => {
+    const won = play([0, 3, 1, 4, 2]) // X wins
+    expect(voteRematch(voteRematch(won, 'X'), 'O')).toEqual(newGame(players, 'O'))
+    const oWins = { ...won, result: { winner: 'O' as const, line: [3, 4, 5] } }
+    expect(voteRematch(voteRematch(oWins, 'X'), 'O')).toEqual(newGame(players, 'X'))
+  })
+  it('after a draw, whoever went second starts', () => {
+    const drawn = play([0, 1, 2, 4, 3, 5, 7, 6, 8]) // X started
+    const s = voteRematch(voteRematch(drawn, 'O'), 'X')
+    expect(s).toEqual(newGame(players, 'O'))
+    const again = voteRematch(voteRematch({ ...s, result: { winner: null } }, 'O'), 'X')
+    expect(again.startedBy).toBe('X')
   })
 })

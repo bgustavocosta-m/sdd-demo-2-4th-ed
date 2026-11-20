@@ -1,7 +1,7 @@
 import Peer, { type DataConnection } from 'peerjs'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GameState, Profile } from '../game/ticTacToe'
-import { hostHandle, hostMove, initialHost, type HostState } from '../room/hostReducer'
+import { hostHandle, hostMove, hostRematch, initialHost, type HostState } from '../room/hostReducer'
 import { hostPeerId, isValidSlug, makeSlug } from '../room/slug'
 import { parseMessage, type Message } from './protocol'
 
@@ -169,5 +169,17 @@ export function usePeerRoom({ slug, profile }: Options) {
     [role],
   )
 
-  return { role, status, state, sendMove } as const
+  const sendRematch = useCallback(() => {
+    if (role === 'host') {
+      if (!hostRef.current) return
+      const { state: next, replies } = hostRematch(hostRef.current)
+      hostRef.current = next
+      sendToGuestRef.current(replies)
+      setState(next.game)
+    } else if (guestConn.current) {
+      send(guestConn.current, { type: 'rematch' })
+    }
+  }, [role])
+
+  return { role, status, state, sendMove, sendRematch } as const
 }

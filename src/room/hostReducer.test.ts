@@ -45,4 +45,20 @@ describe('hostHandle', () => {
     expect(r.replies).toEqual([{ type: 'state', state: r.state.game }])
     expect(hostMove(r.state, 1).replies).toEqual([])
   })
+  it('guest rematch votes as O; host vote completes the reset', async () => {
+    const { hostRematch } = await import('./hostReducer')
+    let s = hostHandle(initialHost(host), hello).state
+    s = { ...s, game: { ...s.game!, result: { winner: 'X', line: [0, 1, 2] } } }
+    const g = hostHandle(s, { type: 'rematch' })
+    expect(g.state.game?.rematchVotes).toEqual(['O'])
+    expect(g.replies).toEqual([{ type: 'state', state: g.state.game }])
+    const h = hostRematch(g.state)
+    expect(h.state.game?.result).toBeNull()
+    expect(h.state.game?.turn).toBe('O')
+    expect(h.replies).toEqual([{ type: 'state', state: h.state.game }])
+  })
+  it('ignores rematch while a game is in progress', () => {
+    const s = hostHandle(initialHost(host), hello).state
+    expect(hostHandle(s, { type: 'rematch' })).toEqual({ state: s, replies: [] })
+  })
 })
