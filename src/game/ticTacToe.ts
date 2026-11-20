@@ -48,3 +48,15 @@ export function applyMove(state: GameState, mark: Mark, cell: number): GameState
   const result = winner(board) ?? (board.every(Boolean) ? { winner: null } : null)
   return { ...state, board, turn: other(mark), result }
 }
+
+/**
+ * Records `mark`'s rematch vote once the game is over. When both have voted, starts a
+ * new game: the loser goes first; after a draw, whoever went second last game starts.
+ */
+export function voteRematch(state: GameState, mark: Mark): GameState {
+  if (!state.result || state.rematchVotes.includes(mark)) return state
+  const rematchVotes = [...state.rematchVotes, mark]
+  if (rematchVotes.length < 2) return { ...state, rematchVotes }
+  const starter = state.result.winner ? other(state.result.winner) : other(state.startedBy)
+  return newGame(state.players, starter)
+}

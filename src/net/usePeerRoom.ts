@@ -1,20 +1,13 @@
 import Peer, { type DataConnection } from 'peerjs'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GameState, Profile } from '../game/ticTacToe'
-import { hostHandle, hostMove, initialHost, type HostState } from '../room/hostReducer'
+import { hostHandle, hostMove, hostRematch, initialHost, type HostState } from '../room/hostReducer'
 import { hostPeerId, isValidSlug, makeSlug } from '../room/slug'
+import { guestStatus, type GuestEvent, type RoomStatus } from './guestStatus'
 import { createHeartbeat } from './heartbeat'
 import { parseMessage, type Message } from './protocol'
 
-export type RoomStatus =
-  | 'invalid'
-  | 'connecting'
-  | 'waiting'
-  | 'full'
-  | 'not-found'
-  | 'playing'
-  | 'opponent-left'
-  | 'error'
+export type { RoomStatus }
 
 const CONN_OPTS = { reliable: true, serialization: 'json' } as const
 const MAX_ATTEMPTS = 3
@@ -151,28 +144,29 @@ export function usePeerRoom({ slug, profile }: Options) {
     if (!valid || role !== 'guest' || !profile) return
     let disposed = false
     const peer = new Peer()
-    const update = (s: RoomStatus) => !disposed && setStatus(s)
+    const update = (event: GuestEvent) => !disposed && setStatus((s) => guestStatus(s, event))
     let alive: ReturnType<typeof keepAlive> | null = null
-    peer.on('error', (err) => update(err.type === 'peer-unavailable' ? 'not-found' : 'error'))
+    peer.on('error', (err) => update({ type: 'peer-error', error: err.type }))
     peer.on('open', () => {
       const conn = peer.connect(hostPeerId(slug), CONN_OPTS)
       guestConn.current = conn
       conn.on('open', () => {
         send(conn, { type: 'hello', name: profile.name, emoji: profile.emoji })
-        alive = keepAlive(conn, () => update('opponent-left'))
+        // A heartbeat timeout counts as the connection closing.
+        alive = keepAlive(conn, () => update({ type: 'close' }))
       })
       conn.on('data', (raw) => {
         const msg = parseMessage(raw)
         if (disposed || !msg || alive?.handle(msg)) return
         if (msg.type === 'full') {
-          disposed = true
           alive?.stop()
-          setStatus('full')
+          update({ type: 'full' })
         } else if (msg.type === 'state') {
           setState(msg.state)
-          setStatus('playing')
+          update({ type: 'state' })
         }
       })
+      conn.on('close', () => update({ type: 'close' }))
     })
     return () => {
       disposed = true
@@ -213,5 +207,17 @@ export function usePeerRoom({ slug, profile }: Options) {
     [role],
   )
 
-  return { role, status, state, sendMove } as const
+  const sendRematch = useCallback(() => {
+    if (role === 'host') {
+      if (!hostRef.current) return
+      const { state: next, replies } = hostRematch(hostRef.current)
+      hostRef.current = next
+      sendToGuestRef.current(replies)
+      setState(next.game)
+    } else if (guestConn.current) {
+      send(guestConn.current, { type: 'rematch' })
+    }
+  }, [role])
+
+  return { role, status, state, sendMove, sendRematch } as const
 }
