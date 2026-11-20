@@ -3,17 +3,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GameState, Profile } from '../game/ticTacToe'
 import { hostHandle, hostMove, hostRematch, initialHost, type HostState } from '../room/hostReducer'
 import { hostPeerId, isValidSlug, makeSlug } from '../room/slug'
+import { guestStatus, type GuestEvent, type RoomStatus } from './guestStatus'
 import { parseMessage, type Message } from './protocol'
 
-export type RoomStatus =
-  | 'invalid'
-  | 'connecting'
-  | 'waiting'
-  | 'full'
-  | 'not-found'
-  | 'playing'
-  | 'opponent-left'
-  | 'error'
+export type { RoomStatus }
 
 const CONN_OPTS = { reliable: true, serialization: 'json' } as const
 const MAX_ATTEMPTS = 3
@@ -112,8 +105,8 @@ export function usePeerRoom({ slug, profile }: Options) {
     if (!valid || role !== 'guest' || !profile) return
     let disposed = false
     const peer = new Peer()
-    const update = (s: RoomStatus) => !disposed && setStatus(s)
-    peer.on('error', (err) => update(err.type === 'peer-unavailable' ? 'not-found' : 'error'))
+    const update = (event: GuestEvent) => !disposed && setStatus((s) => guestStatus(s, event))
+    peer.on('error', (err) => update({ type: 'peer-error', error: err.type }))
     peer.on('open', () => {
       const conn = peer.connect(hostPeerId(slug), CONN_OPTS)
       guestConn.current = conn
@@ -122,14 +115,13 @@ export function usePeerRoom({ slug, profile }: Options) {
         const msg = parseMessage(raw)
         if (disposed || !msg) return
         if (msg.type === 'full') {
-          disposed = true
-          setStatus('full')
+          update({ type: 'full' })
         } else if (msg.type === 'state') {
           setState(msg.state)
-          setStatus('playing')
+          update({ type: 'state' })
         }
       })
-      conn.on('close', () => update('opponent-left'))
+      conn.on('close', () => update({ type: 'close' }))
     })
     return () => {
       disposed = true
