@@ -57,6 +57,8 @@ function Room({ slug, profile }: { slug: string; profile: Profile | null }) {
       return <NewRoom message="Room not found or host left" />
     case 'error':
       return <NewRoom message="Connection error" />
+    case 'opponent-left':
+      return <NewRoom message="Opponent left" />
     case 'connecting':
       return (
         <main>
@@ -87,7 +89,6 @@ function Room({ slug, profile }: { slug: string; profile: Profile | null }) {
   return (
     <main>
       <h1>Tic-tac-toe</h1>
-      {status === 'opponent-left' && <p className="error">Opponent left</p>}
       {state && (
         <>
           <PlayerBar state={state} me={me} />

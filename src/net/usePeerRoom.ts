@@ -4,6 +4,7 @@ import type { GameState, Profile } from '../game/ticTacToe'
 import { hostHandle, hostMove, hostRematch, initialHost, type HostState } from '../room/hostReducer'
 import { hostPeerId, isValidSlug, makeSlug } from '../room/slug'
 import { guestStatus, type GuestEvent, type RoomStatus } from './guestStatus'
+import { createHeartbeat } from './heartbeat'
 import { parseMessage, type Message } from './protocol'
 
 export type { RoomStatus }
@@ -44,6 +45,41 @@ export async function createRoom(profile: Profile): Promise<string> {
 
 const send = (conn: DataConnection, msg: Message) => conn.send(msg)
 
+/**
+ * Pings the other side, answers its pings, and calls `onLeft` once when the
+ * connection closes or the heartbeat times out (which also closes it).
+ */
+function keepAlive(conn: DataConnection, onLeft: () => void) {
+  let done = false
+  const leave = () => {
+    if (done) return
+    done = true
+    heartbeat.stop()
+    onLeft()
+  }
+  const heartbeat = createHeartbeat({
+    send: (msg) => send(conn, msg),
+    onTimeout: () => {
+      leave()
+      conn.close()
+    },
+  })
+  conn.on('close', leave)
+  return {
+    /** Handles `ping`/`pong`; returns true if the message was one of them. */
+    handle(msg: Message): boolean {
+      if (msg.type === 'ping') send(conn, { type: 'pong' })
+      else if (msg.type === 'pong') heartbeat.onPong()
+      else return false
+      return true
+    },
+    stop() {
+      done = true
+      heartbeat.stop()
+    },
+  }
+}
+
 interface Options {
   slug: string
   profile: Profile | null
@@ -65,12 +101,14 @@ export function usePeerRoom({ slug, profile }: Options) {
     const { peer } = room
     hostRef.current ??= initialHost(room.profile)
     let disposed = false
+    let alive: ReturnType<typeof keepAlive> | null = null
 
     const onConnection = (conn: DataConnection) => {
       conn.on('data', (raw) => {
         const msg = parseMessage(raw)
         if (!msg || !hostRef.current) return
         const isGuest = guestConn.current === conn
+        if (isGuest && alive?.handle(msg)) return
         if (!isGuest && msg.type !== 'hello') return
         if (isGuest && msg.type === 'hello') return
         const { state: next, replies } = hostHandle(hostRef.current, msg)
@@ -81,7 +119,7 @@ export function usePeerRoom({ slug, profile }: Options) {
         }
         if (msg.type === 'hello') {
           guestConn.current = conn
-          conn.on('close', () => !disposed && setStatus('opponent-left'))
+          alive = keepAlive(conn, () => !disposed && setStatus('opponent-left'))
         }
         hostRef.current = next
         replies.forEach((r) => send(conn, r))
@@ -96,6 +134,7 @@ export function usePeerRoom({ slug, profile }: Options) {
     peer.on('connection', onConnection)
     return () => {
       disposed = true
+      alive?.stop()
       peer.off('connection', onConnection)
     }
   }, [slug, valid])
@@ -106,15 +145,21 @@ export function usePeerRoom({ slug, profile }: Options) {
     let disposed = false
     const peer = new Peer()
     const update = (event: GuestEvent) => !disposed && setStatus((s) => guestStatus(s, event))
+    let alive: ReturnType<typeof keepAlive> | null = null
     peer.on('error', (err) => update({ type: 'peer-error', error: err.type }))
     peer.on('open', () => {
       const conn = peer.connect(hostPeerId(slug), CONN_OPTS)
       guestConn.current = conn
-      conn.on('open', () => send(conn, { type: 'hello', name: profile.name, emoji: profile.emoji }))
+      conn.on('open', () => {
+        send(conn, { type: 'hello', name: profile.name, emoji: profile.emoji })
+        // A heartbeat timeout counts as the connection closing.
+        alive = keepAlive(conn, () => update({ type: 'close' }))
+      })
       conn.on('data', (raw) => {
         const msg = parseMessage(raw)
-        if (disposed || !msg) return
+        if (disposed || !msg || alive?.handle(msg)) return
         if (msg.type === 'full') {
+          alive?.stop()
           update({ type: 'full' })
         } else if (msg.type === 'state') {
           setState(msg.state)
@@ -125,6 +170,7 @@ export function usePeerRoom({ slug, profile }: Options) {
     })
     return () => {
       disposed = true
+      alive?.stop()
       guestConn.current = null
       peer.destroy()
     }
