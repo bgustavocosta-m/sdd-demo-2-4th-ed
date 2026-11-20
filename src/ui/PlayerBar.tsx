@@ -1,34 +1,33 @@
-import type { GameState, Mark } from '../game/ticTacToe'
+import { other, type GameState, type Mark } from '../game/ticTacToe'
+import { Avatar, MarkGlyph } from './Shell'
 
 interface Props {
   state: GameState
   me: Mark
 }
 
+/** Both player cards (the one to move is highlighted) and the live turn headline. */
 export function PlayerBar({ state, me }: Props) {
-  const { result, turn, players } = state
-  const status = result
-    ? result.winner === null
-      ? "It's a draw"
-      : result.winner === me
-        ? 'You win!'
-        : `${players[result.winner].name} wins`
-    : turn === me
-      ? 'Your turn'
-      : `${players[turn].name}'s turn`
+  const { turn, players } = state
+  const them = players[other(me)]
   return (
-    <div className="player-bar">
-      <ul className="players">
+    <>
+      <section className="player-cards" aria-label="Players">
         {(['X', 'O'] as const).map((m) => (
-          <li key={m} className={!result && turn === m ? 'player active' : 'player'}>
-            <span className="mark">{m}</span> {players[m].emoji} {players[m].name}
-            {m === me && ' (you)'}
-          </li>
+          <div key={m} className={turn === m ? `player-card active active-${m.toLowerCase()}` : 'player-card'}>
+            <Avatar emoji={players[m].emoji} mark={m} size="sm" />
+            <span className="player-meta">
+              <span className="player-name">{players[m].name}</span>
+              <span className="hint-sm">{m === me ? 'You' : 'Opponent'}</span>
+            </span>
+            <MarkGlyph mark={m} />
+          </div>
         ))}
-      </ul>
-      <p className="status" role="status">
-        {status}
-      </p>
-    </div>
+      </section>
+      <div className="headline-block" role="status" aria-live="polite">
+        <span className="h2">{turn === me ? 'Your turn' : `${players[turn].name}’s turn`}</span>
+        <span className="subline">{turn === me ? `You’re ${me}` : `Waiting for ${them.name} to move…`}</span>
+      </div>
+    </>
   )
 }
