@@ -20,6 +20,13 @@ describe('hostHandle', () => {
     expect(state).toBe(s1)
     expect(replies).toEqual([{ type: 'full' }])
   })
+  it('a later hello still gets full once the game is over', () => {
+    const s1 = hostHandle(initialHost(host), hello).state
+    const over = { ...s1, game: { ...s1.game!, result: { winner: null } } }
+    const { state, replies } = hostHandle(over, { ...hello, name: 'Cy' })
+    expect(state).toBe(over)
+    expect(replies).toEqual([{ type: 'full' }])
+  })
   it('applies a legal guest move as O', () => {
     let s = hostHandle(initialHost(host), hello).state
     s = { ...s, game: { ...s.game!, turn: 'O' } }
